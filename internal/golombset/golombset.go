@@ -1,6 +1,7 @@
 package golombset
 
 import (
+	"bytes"
 	"hash/fnv"
 	"sort"
 	"strconv"
@@ -22,6 +23,24 @@ func (g *GolombSet) Add(p []byte) error {
 	return nil
 }
 
+func (g *GolombSet) Search(p []byte) bool {
+	hash := g.hash(p)
+	var prev uint
+	for _, v := range g.Codes {
+		idx := bytes.Index(v, []byte("0"))
+		quot := unary.Decode(v[0 : idx+1])
+		rem, _ := strconv.ParseInt(string(v[idx+1:]), 2, 64)
+		o := g.P*uint(quot) + uint(rem)
+
+		h := o + prev
+		if h == hash {
+			return true
+		}
+		prev = h
+	}
+	return false
+}
+
 func (g *GolombSet) Encode() error {
 	// Sort hash values
 	sort.Slice(g.Store, func(i, j int) bool {
@@ -29,8 +48,12 @@ func (g *GolombSet) Encode() error {
 	})
 
 	diffs := make([]int, 0, len(g.Store))
-	for i := 0; i < len(g.Store)-1; i++ {
-		diffs = append(diffs, int(g.Store[i+1]-g.Store[i]))
+	for i := 0; i < len(g.Store); i++ {
+		if i == 0 {
+			diffs = append(diffs, int(g.Store[i]))
+			continue
+		}
+		diffs = append(diffs, int(g.Store[i]-g.Store[i-1]))
 	}
 	g.Diffs = diffs
 
