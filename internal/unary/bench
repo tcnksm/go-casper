@@ -1,0 +1,3 @@
+BenchmarkEncode-4   	  300000	      4727 ns/op	   10240 B/op	       1 allocs/op
+PASS
+ok  	github.com/tcnksm/go-casper/internal/unary	1.476s
