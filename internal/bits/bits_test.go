@@ -23,9 +23,8 @@ func TestWriter(t *testing.T) {
 
 	for _, tc := range cases {
 		var buf bytes.Buffer
-		writer := &Writer{
-			wr: &buf,
-		}
+		writer := NewWriter(&buf)
+
 		for _, input := range tc.inputs {
 			if err := writer.Write(input, tc.size); err != nil {
 				t.Fatalf("Write should not fail: %s", err)
