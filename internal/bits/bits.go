@@ -49,7 +49,32 @@ func (w *Writer) Flush() error {
 	return nil
 }
 
-type Reader struct{}
+type Reader struct {
+	n int  // current number of bits
+	v uint // current accumulated value
+
+	rd io.Reader
+}
+
+func (r *Reader) Read(n int) (uint, error) {
+	for r.n <= n {
+		r.v <<= 8
+		var b uint8
+		if err := binary.Read(r.rd, binary.BigEndian, &b); err != nil {
+			return 0, err
+		}
+		r.v |= uint(b)
+
+		r.n += 8
+	}
+
+	v := r.v >> uint(r.n-n)
+
+	r.n -= n
+	r.v &= mask(r.n)
+
+	return v, nil
+}
 
 func mask(n int) uint {
 	return (1 << uint(n)) - 1
