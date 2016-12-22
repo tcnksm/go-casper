@@ -5,6 +5,7 @@ import (
 	"io"
 )
 
+// Writer
 type Writer struct {
 	n int  // current number of bits
 	v uint // current accumulated value
@@ -12,6 +13,14 @@ type Writer struct {
 	wr io.Writer
 }
 
+// NewWriter returns a new Writer.
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{
+		wr: w,
+	}
+}
+
+// Write writes bits with give size n.
 func (w *Writer) Write(bits uint, n int) error {
 	w.v <<= uint(n)
 	w.v |= bits & mask(n)
@@ -24,6 +33,19 @@ func (w *Writer) Write(bits uint, n int) error {
 		w.n -= 8
 	}
 	w.v &= mask(8)
+
+	return nil
+}
+
+// Flush writes any remaining bits to the underlying io.Writer.
+// bits will be left-shifted.
+func (w *Writer) Flush() error {
+	if w.n != 0 {
+		b := (w.v << (8 - uint(w.n))) & mask(8)
+		if err := binary.Write(w.wr, binary.BigEndian, uint8(b)); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
