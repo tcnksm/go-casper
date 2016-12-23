@@ -3,7 +3,6 @@ package bits
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"testing"
 )
 
@@ -17,7 +16,7 @@ func TestReader(t *testing.T) {
 		{3, 7},  // 111
 		{5, 28}, // 11100
 		{3, 1},  // 001
-		{2, 3},  // 11
+		{3, 7},  // 111
 	}
 
 	rd := bytes.NewReader(input)
@@ -27,7 +26,7 @@ func TestReader(t *testing.T) {
 
 	for _, tc := range cases {
 		got, err := reader.Read(tc.n)
-		if err != nil && err != io.EOF {
+		if err != nil {
 			t.Fatalf("Read(%d) should not fail: %s", tc.n, err)
 		}
 

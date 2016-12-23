@@ -60,7 +60,8 @@ func (r *Reader) Read(n int) (uint, error) {
 	for r.n <= n {
 		r.v <<= 8
 		var b uint8
-		if err := binary.Read(r.rd, binary.BigEndian, &b); err != nil {
+		err := binary.Read(r.rd, binary.BigEndian, &b)
+		if err != nil && err != io.EOF {
 			return 0, err
 		}
 		r.v |= uint(b)
