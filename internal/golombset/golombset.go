@@ -1,76 +1,142 @@
 package golombset
 
 import (
-	"bytes"
-	"hash/fnv"
-	"sort"
-	"strconv"
+	"io"
+	"math"
 
-	"github.com/tcnksm/go-casper/internal/unary"
+	"github.com/tcnksm/go-casper/internal/bits"
 )
 
-type GolombSet struct {
-	N uint // number of elements
-	P uint // false-positive probability
-
-	Store []uint
-	Diffs []int
-	Codes [][]byte
-}
-
-func (g *GolombSet) Add(p []byte) error {
-	g.Store = append(g.Store, g.hash(p))
-	return nil
-}
-
-func (g *GolombSet) Search(p []byte) bool {
-	hash := g.hash(p)
-	var prev uint
-	for _, v := range g.Codes {
-		idx := bytes.Index(v, []byte("0"))
-		quot := unary.Decode(v[0 : idx+1])
-		rem, _ := strconv.ParseInt(string(v[idx+1:]), 2, 64)
-		o := g.P*uint(quot) + uint(rem)
-
-		h := o + prev
-		if h == hash {
+func Search(sc *Scanner, h uint) bool {
+	var n uint
+	for sc.Scan() {
+		n += sc.Value()
+		if h == n {
 			return true
 		}
-		prev = h
+
+		if h < n {
+			return false
+		}
 	}
+
 	return false
 }
 
-func (g *GolombSet) Encode() error {
-	// Sort hash values
-	sort.Slice(g.Store, func(i, j int) bool {
-		return g.Store[i] < g.Store[j]
-	})
+type Scanner struct {
+	n uint // number of elements
+	p uint // false-positive probability
 
-	diffs := make([]int, 0, len(g.Store))
-	for i := 0; i < len(g.Store); i++ {
-		if i == 0 {
-			diffs = append(diffs, int(g.Store[i]))
-			continue
-		}
-		diffs = append(diffs, int(g.Store[i]-g.Store[i-1]))
-	}
-	g.Diffs = diffs
+	bitLen int // log2(P)
 
-	for _, v := range diffs {
-		quot, rem := uint(v)/g.P, uint(v)%g.P
+	value uint  // last scanned value
+	err   error // first error while scanning
 
-		quotB := unary.Encode(int(quot))
-		remB := []byte(strconv.FormatInt(int64(rem), 2))
-		gv := append(quotB, remB...)
-		g.Codes = append(g.Codes, gv)
-	}
-	return nil
+	r *bits.Reader
 }
 
-func (g *GolombSet) hash(p []byte) uint {
-	h := fnv.New64a()
-	h.Write(p)
-	i := uint(h.Sum64())
-	return i % (g.N * g.P)
+func NewScanner(r io.Reader, n, p uint) *Scanner {
+	return &Scanner{
+		n:      n,
+		p:      p,
+		bitLen: int(math.Log2(float64(p))),
+		r:      bits.NewReader(r),
+	}
+}
+
+// Scan advances the Scanner to the next value, which will then be
+// available through the Value method. It will returns false when
+// the scan stop, either by reaching the end of the input or an error.
+func (sc *Scanner) Scan() bool {
+
+	// Stop if last scan reached EOF
+	if sc.err == io.EOF {
+		return false
+	}
+
+	var v uint
+	for {
+
+		b, err := sc.r.Read(1)
+		if err != nil {
+			sc.err = err
+			if err != io.EOF {
+				return false
+			}
+
+		}
+
+		if b == 0 {
+			break
+		}
+		v += sc.p
+	}
+
+	r, err := sc.r.Read(sc.bitLen)
+	if err != nil {
+		sc.err = err
+		if err != io.EOF {
+			return false
+		}
+	}
+	v += r
+
+	sc.value = v
+	return true
+}
+
+// Value returns last scanned value
+func (sc *Scanner) Value() uint {
+	return sc.value
+}
+
+// Err returns non-EOF error
+func (sc *Scanner) Err() error {
+	if sc.err == io.EOF {
+		return nil
+	}
+	return sc.err
+}
+
+type Encoder struct {
+	n uint // number of elements
+	p uint // false-positive probability
+
+	// bitLen is number of bits for writing remainder.
+	bitLen int
+
+	w io.Writer
+}
+
+func NewEncoder(w io.Writer, n, p uint) *Encoder {
+	bitLen := int(math.Log2(float64(p)))
+	return &Encoder{
+		n:      n,
+		p:      p,
+		bitLen: bitLen,
+		w:      w,
+	}
+}
+
+func (e *Encoder) Encode(src []uint) error {
+	if len(src) == 0 {
+		return nil
+	}
+
+	wr := bits.NewWriter(e.w)
+	for _, v := range src {
+		q, r := v/e.p, v%e.p
+
+		// Write unary code of quotient
+		if err := wr.Write(1<<(uint(q)+1)-2, int(q+1)); err != nil {
+			return err
+		}
+
+		// Write remainder
+		if err := wr.Write(r, e.bitLen); err != nil {
+			return err
+		}
+	}
+
+	return wr.Flush()
 }

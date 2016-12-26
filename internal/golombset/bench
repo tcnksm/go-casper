@@ -1,3 +1,0 @@
-BenchmarkGlombSet-4   	 3000000	       588 ns/op	      64 B/op	       9 allocs/op
-PASS
-ok  	github.com/tcnksm/go-casper/internal/golombset	2.364s
