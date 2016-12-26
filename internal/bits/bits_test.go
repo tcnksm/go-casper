@@ -3,11 +3,15 @@ package bits
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"testing"
 )
 
 func TestReader(t *testing.T) {
 	input := []byte{0xff, 0x0f} // 1111 1111 0000 1111
+	rd := bytes.NewReader(input)
+	reader := NewReader(rd)
+
 	cases := []struct {
 		n    int
 		want uint
@@ -19,14 +23,9 @@ func TestReader(t *testing.T) {
 		{3, 7},  // 111
 	}
 
-	rd := bytes.NewReader(input)
-	reader := &Reader{
-		rd: rd,
-	}
-
 	for _, tc := range cases {
 		got, err := reader.Read(tc.n)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			t.Fatalf("Read(%d) should not fail: %s", tc.n, err)
 		}
 

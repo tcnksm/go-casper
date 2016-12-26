@@ -56,11 +56,19 @@ type Reader struct {
 	rd io.Reader
 }
 
+func NewReader(rd io.Reader) *Reader {
+	return &Reader{
+		rd: rd,
+	}
+}
+
 func (r *Reader) Read(n int) (uint, error) {
+	var err error
+
 	for r.n <= n {
 		r.v <<= 8
 		var b uint8
-		err := binary.Read(r.rd, binary.BigEndian, &b)
+		err = binary.Read(r.rd, binary.BigEndian, &b)
 		if err != nil && err != io.EOF {
 			return 0, err
 		}
@@ -68,13 +76,12 @@ func (r *Reader) Read(n int) (uint, error) {
 
 		r.n += 8
 	}
-
 	v := r.v >> uint(r.n-n)
 
 	r.n -= n
 	r.v &= mask(r.n)
 
-	return v, nil
+	return v, err
 }
 
 func mask(n int) uint {
