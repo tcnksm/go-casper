@@ -108,6 +108,7 @@ type Encoder struct {
 	w io.Writer
 }
 
+// NewEncoder returns a new Encoder.
 func NewEncoder(w io.Writer, n, p uint) *Encoder {
 	bitLen := int(math.Log2(float64(p)))
 	return &Encoder{
@@ -118,6 +119,8 @@ func NewEncoder(w io.Writer, n, p uint) *Encoder {
 	}
 }
 
+// Encode encodes the given array and write to underlying io.Writer.
+// src must be the array of difference of uniformly distribute set of values.
 func (e *Encoder) Encode(src []uint) error {
 	if len(src) == 0 {
 		return nil
