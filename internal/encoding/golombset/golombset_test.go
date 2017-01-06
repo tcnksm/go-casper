@@ -5,58 +5,106 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"io"
 	"os"
+	"reflect"
 	"sort"
 	"strconv"
 	"testing"
+
+	"github.com/tcnksm/go-casper/internal/bits"
 )
 
-func TestScanner(t *testing.T) {
+func TestDecode(t *testing.T) {
 	cases := []struct {
 		input []byte
-		want  []uint
+		p     uint
+		want  uint
+		err   error
 	}{
 		{
-			[]byte{0x97}, // 10010111
-			[]uint{87},
+			[]byte{0xcb, 0x80}, // 11001011 10000000
+			1 << 6,
+			151,
+			nil,
 		},
 		{
-			[]byte{0xcb, 0x80}, // 11001011 10000000
-			[]uint{151, 0},
+			[]byte{0xcb}, // 11001011
+			1 << 5,
+			75,
+			io.EOF,
+		},
+		{
+			[]byte{0x00}, // 00000000
+			1 << 7,
+			0,
+			errPadding,
 		},
 	}
 
 	for _, tc := range cases {
-		sc := NewScanner(bytes.NewReader(tc.input), 26, 64)
-		var index int
-		for sc.Scan() {
-			if got := sc.Value(); got != tc.want[index] {
-				t.Fatalf("Scan=%d, want=%d", got, tc.want[index])
-			}
-			index++
+		rd := bytes.NewReader(tc.input)
+		br := bits.NewReader(rd)
+		got, err := decode(br, tc.p)
+		if err != tc.err {
+			t.Errorf("error=%v, want=%v", err, tc.err)
 		}
 
-		if err := sc.Err(); err != nil {
+		if got != tc.want {
+			t.Errorf("decode=%v, want=%v", got, tc.want)
+		}
+
+	}
+}
+
+func TestDecodeAll(t *testing.T) {
+	cases := []struct {
+		input []byte
+		p     uint
+		want  []uint
+	}{
+		{
+			[]byte{0xcb, 0x80}, // 11001011 10000000
+			1 << 6,
+			[]uint{151},
+		},
+
+		{
+			[]byte{0xcb, 0xcf}, // 11001011 11001111
+			1 << 5,
+			[]uint{75, 154},
+		},
+	}
+
+	for _, tc := range cases {
+		got, err := DecodeAll(tc.input, tc.p)
+		if err != nil {
 			t.Fatal(err)
 		}
+
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("Decode=%v, want=%v", got, tc.want)
+		}
+
 	}
 }
 
 func TestEncoding(t *testing.T) {
 	cases := []struct {
 		input []uint
+		p     uint
 		want  []byte
 	}{
 		{
 			[]uint{151},
+			1 << 6,
 			[]byte{0xcb, 0x80}, // 11001011 10000000
 		},
 	}
 
 	for _, tc := range cases {
 		var buf bytes.Buffer
-		encoder := NewEncoder(&buf, 26, 64)
-		if err := encoder.Encode(tc.input); err != nil {
+		if err := Encode(&buf, tc.input, tc.p); err != nil {
 			t.Fatal(err)
 		}
 
@@ -66,10 +114,21 @@ func TestEncoding(t *testing.T) {
 	}
 }
 
-// This test used data set from [1].
-//
-// [1]: https://github.com/rasky/gcs
+// This test used data set from https://github.com/rasky/gcs
 func TestGlombSet(t *testing.T) {
+
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"alpha", true},
+		{"hotel", true},
+		{"whiskey", true},
+		{"november", true},
+
+		{"Taichi", false},
+		{"Nakashima", false},
+	}
 
 	n, p := uint(26), uint(64)
 	file := "./testdata/words.nato"
@@ -102,40 +161,36 @@ func TestGlombSet(t *testing.T) {
 		return a[i] < a[j]
 	})
 
-	diffs := make([]uint, 0, len(a))
-	for i := 0; i < len(a); i++ {
-		if i == 0 {
-			diffs = append(diffs, a[i])
-			continue
-		}
-		diffs = append(diffs, a[i]-a[i-1])
-	}
-
 	// Encode hash value array to Golomb-coded sets
 	// and write it to buffer.
 	var buf bytes.Buffer
-	encoder := NewEncoder(&buf, n, p)
-	if err := encoder.Encode(diffs); err != nil {
+	if err := Encode(&buf, a, p); err != nil {
 		t.Fatal(err)
 	}
 
-	cases := []struct {
-		input string
-		want  bool
-	}{
-		{"alpha", true},
-		{"hotel", true},
-		{"whiskey", true},
-		{"november", true},
-
-		{"Taichi", false},
-		{"Nakashima", false},
+	// DecodeAll
+	decoded, err := DecodeAll(buf.Bytes(), p)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for _, tc := range cases {
-		sc := NewScanner(bytes.NewReader(buf.Bytes()), n, p)
-		if got := Search(sc, hashFunc([]byte(tc.input))); got != tc.want {
+		if got := search(decoded, hashFunc([]byte(tc.input))); got != tc.want {
 			t.Errorf("Search(%s)=%t, want=%t", tc.input, got, tc.want)
 		}
 	}
+}
+
+func search(a []uint, h uint) bool {
+	// TODO(tcnksm): Binary search
+	for i := 0; i < len(a); i++ {
+		if h == a[i] {
+			return true
+		}
+
+		if h < a[i] {
+			return false
+		}
+	}
+	return false
 }
