@@ -23,7 +23,14 @@ type Casper struct {
 	n uint // TODO(tcnksm): need ..?
 }
 
-type Options struct{}
+type Options struct {
+
+	// skipPush skips server pushing. This should be only used in testing.
+	// Currently, it's kinda hard to receive http push in go http client.
+	// Set this and ignore pushing and only test cookie part.
+	// This should be removed in future.
+	skipPush bool
+}
 
 func New(p, n uint) *Casper {
 	return &Casper{
@@ -81,10 +88,12 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		return nil
 	}
 
-	if err := pusher.Push(content, nil); err != nil {
-		return err
+	if !opts.skipPush {
+		if err := pusher.Push(content, nil); err != nil {
+			return err
+		}
+		log.Println("Pushed")
 	}
-	log.Println("Pushed")
 
 	// Set cookie
 	hashs = append(hashs, h)
