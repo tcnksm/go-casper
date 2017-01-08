@@ -11,10 +11,10 @@ import (
 
 func TestPush(t *testing.T) {
 	casper := New(1<<6, 10)
-	opts := &Options{
-		skipPush: true,
-	}
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		opts := &Options{
+			skipPush: true,
+		}
 		if err := casper.Push(w, r, "/static/example.jpg", opts); err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
@@ -73,6 +73,39 @@ func TestPush(t *testing.T) {
 
 	if !exist {
 		t.Fatalf("cookie %q is not set", cookieName)
+	}
+}
+
+func TestGenerateCookie(t *testing.T) {
+	// TODO(tcnksm): Check this value is reasonable or not
+	want := "%16%D0%900O%3C%CE%B81%10"
+	contents := []string{
+		"/static/example1.jpg",
+		"/static/example2.jpg",
+		"/static/example3.jpg",
+		"/static/example4.jpg",
+		"/static/example5.jpg",
+		"/static/example6.jpg",
+		"/static/example7.jpg",
+		"/static/example8.jpg",
+		"/static/example9.jpg",
+		"/static/example10.jpg",
+	}
+
+	casper := New(1<<6, len(contents))
+	hashs := make([]uint, 0, len(contents))
+
+	for _, content := range contents {
+		hashs = append(hashs, casper.hash([]byte(content)))
+	}
+
+	got, err := casper.generateCookie(hashs)
+	if err != nil {
+		t.Fatalf("generateCookie should not fail")
+	}
+
+	if got != want {
+		t.Fatalf("generateCookie=%q, want=%q", got, want)
 	}
 }
 

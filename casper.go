@@ -39,10 +39,10 @@ type Options struct {
 }
 
 // New initialize casper.
-func New(p, n uint) *Casper {
+func New(p, n int) *Casper {
 	return &Casper{
-		p: p,
-		n: n,
+		p: uint(p),
+		n: uint(n),
 	}
 }
 
