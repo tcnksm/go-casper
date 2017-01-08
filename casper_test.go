@@ -10,12 +10,12 @@ import (
 )
 
 func TestPush(t *testing.T) {
+	casper := New(1<<6, 10)
+	opts := &Options{
+		skipPush: true,
+	}
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cspr := New(1<<6, 10)
-		opts := &Options{
-			skipPush: true,
-		}
-		if err := cspr.Push(w, r, "/static/example.jpg", opts); err != nil {
+		if err := casper.Push(w, r, "/static/example.jpg", opts); err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
 
@@ -55,6 +55,10 @@ func TestPush(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
+
+	if casper.alreadyPushed {
+		t.Fatalf("content should not be already pushed")
+	}
 
 	cookies := res.Cookies()
 	var exist bool

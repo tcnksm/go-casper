@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -22,14 +21,15 @@ const (
 type Casper struct {
 	p uint
 	n uint
+
+	// alreadyPushed is true when the request cookie indicates
+	// the given content is already pushed.
+	alreadyPushed bool
 }
 
 // Options includes casper push options.
 type Options struct {
-	PushOptions *http.PushOptions
-
-	// force executes server-push without checking cookie value.
-	force bool
+	*http.PushOptions
 
 	// skipPush skips server pushing. This should be only used in testing.
 	// Currently, it's kinda hard to receive http push in go http client.
@@ -63,7 +63,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 
 	h := c.hash([]byte(content))
 	if search(hashs, h) {
-		log.Println("Already pushded")
+		c.alreadyPushed = true
 		return nil
 	}
 
@@ -71,7 +71,6 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		if err := pusher.Push(content, opts.PushOptions); err != nil {
 			return err
 		}
-		log.Println("Pushed")
 	}
 
 	hashs = append(hashs, h)
