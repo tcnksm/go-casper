@@ -71,3 +71,18 @@ func TestPush(t *testing.T) {
 		t.Fatalf("cookie %q is not set", cookieName)
 	}
 }
+
+func TestPush_ServerPushNotSupported(t *testing.T) {
+	var err error
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cspr := New(1<<6, 10)
+		err = cspr.Push(w, r, "/static/example.jpg", nil)
+	}))
+	defer ts.Close()
+
+	http.Get(ts.URL)
+
+	if err == nil {
+		t.Fatal("expect to be failed") // TODO(tcnksm): define error
+	}
+}
