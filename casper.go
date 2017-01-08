@@ -18,12 +18,18 @@ const (
 	cookieName = "x-go-casper"
 )
 
+// Casper stores
 type Casper struct {
 	p uint
-	n uint // TODO(tcnksm): need ..?
+	n uint
 }
 
+// Options includes casper push options.
 type Options struct {
+	PushOptions *http.PushOptions
+
+	// force executes server-push without checking cookie value.
+	force bool
 
 	// skipPush skips server pushing. This should be only used in testing.
 	// Currently, it's kinda hard to receive http push in go http client.
@@ -32,6 +38,7 @@ type Options struct {
 	skipPush bool
 }
 
+// New initialize casper.
 func New(p, n uint) *Casper {
 	return &Casper{
 		p: p,
@@ -39,10 +46,10 @@ func New(p, n uint) *Casper {
 	}
 }
 
-// Push pushes
-//
-// TODO(tcnksm): Handle multiple contents
+// Push pushes the given content and set cookie value.
 func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, opts *Options) error {
+	// Pusher is used later in this function but should check
+	// it's available or not first to avoid waste calc.
 	pusher, ok := w.(http.Pusher)
 	if !ok {
 		// go1.8 or later
@@ -54,65 +61,60 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		return err
 	}
 
-	// TODO(tcnksm): Enable to configure?
-	hashF := func(v []byte) uint {
-		h := md5.New()
-		h.Write(v)
-		b := h.Sum(nil)
-
-		s := hex.EncodeToString(b[12:16])
-		i, err := strconv.ParseUint(s, 16, 32)
-		if err != nil {
-			panic(err)
-		}
-		return uint(i) % (c.n * c.p)
-	}
-
-	// TODO(tcnksm): binary search (or enable to configure?)
-	searchF := func(a []uint, h uint) bool {
-		for i := 0; i < len(a); i++ {
-			if h == a[i] {
-				return true
-			}
-
-			if h < a[i] {
-				return false
-			}
-		}
-		return false
-	}
-
-	h := hashF([]byte(content))
-	if searchF(hashs, h) {
+	h := c.hash([]byte(content))
+	if search(hashs, h) {
 		log.Println("Already pushded")
 		return nil
 	}
 
 	if !opts.skipPush {
-		if err := pusher.Push(content, nil); err != nil {
+		if err := pusher.Push(content, opts.PushOptions); err != nil {
 			return err
 		}
 		log.Println("Pushed")
 	}
 
-	// Set cookie
 	hashs = append(hashs, h)
+	cookieValue, err := c.generateCookie(hashs)
+	if err != nil {
+		return err
+	}
+
+	cookie := &http.Cookie{
+		Name:  cookieName,
+		Value: cookieValue,
+	}
+	http.SetCookie(w, cookie)
+
+	return nil
+}
+
+func (c *Casper) hash(p []byte) uint {
+	h := md5.New()
+	h.Write(p)
+	b := h.Sum(nil)
+
+	s := hex.EncodeToString(b[12:16])
+	i, err := strconv.ParseUint(s, 16, 32)
+	if err != nil {
+		panic(err)
+	}
+	return uint(i) % (c.n * c.p)
+}
+
+// generateCookie generates cookie value from the given hash array.
+func (c *Casper) generateCookie(hashs []uint) (string, error) {
+
 	sort.Slice(hashs, func(i, j int) bool {
 		return hashs[i] < hashs[j]
 	})
 
 	var buf bytes.Buffer
 	if err := golombset.Encode(&buf, hashs, c.p); err != nil {
-		return err
+		return "", err
 	}
 
-	cookie := &http.Cookie{
-		Name:  cookieName,
-		Value: url.QueryEscape(buf.String()),
-	}
-	http.SetCookie(w, cookie)
-
-	return nil
+	return url.QueryEscape(buf.String()), nil
 }
 
 // readCookie reads cookie from http request and decode it to hash array.
@@ -139,4 +141,18 @@ func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
 	}
 
 	return hashs, nil
+}
+
+// TODO(tcnksm): binary search (or enable to configure?)
+func search(a []uint, h uint) bool {
+	for i := 0; i < len(a); i++ {
+		if h == a[i] {
+			return true
+		}
+
+		if h < a[i] {
+			return false
+		}
+	}
+	return false
 }
