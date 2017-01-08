@@ -88,6 +88,8 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	return nil
 }
 
+// hash generate hash value from the given bytes.
+// It's ok to use md5 since this is not for crypto.
 func (c *Casper) hash(p []byte) uint {
 	h := md5.New()
 	h.Write(p)
