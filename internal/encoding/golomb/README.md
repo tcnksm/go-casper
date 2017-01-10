@@ -1,6 +1,7 @@
-# Golomb-coded set
+# Golomb coding
 
-[https://en.wikipedia.org/wiki/Golomb_coding](https://en.wikipedia.org/wiki/Golomb_coding)
+Package `golomb` is golang implementation of [Golomb_coding](https://en.wikipedia.org/wiki/Golomb_coding).
+
 
 ## References
 
