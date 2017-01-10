@@ -1,4 +1,4 @@
-package golombset
+package golomb
 
 import (
 	"bytes"
