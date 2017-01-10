@@ -3,12 +3,13 @@ package casper
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
@@ -74,14 +75,9 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	}
 
 	hashs = append(hashs, h)
-	cookieValue, err := c.generateCookie(hashs)
+	cookie, err := c.generateCookie(hashs)
 	if err != nil {
 		return err
-	}
-
-	cookie := &http.Cookie{
-		Name:  defaultCookieName,
-		Value: cookieValue,
 	}
 	http.SetCookie(w, cookie)
 
@@ -107,18 +103,26 @@ func (c *Casper) hash(p []byte) uint {
 }
 
 // generateCookie generates cookie value from the given hash array.
-func (c *Casper) generateCookie(hashs []uint) (string, error) {
+func (c *Casper) generateCookie(hashs []uint) (*http.Cookie, error) {
 
 	sort.Slice(hashs, func(i, j int) bool {
 		return hashs[i] < hashs[j]
 	})
 
 	var buf bytes.Buffer
-	if err := golomb.Encode(&buf, hashs, c.p); err != nil {
-		return "", err
+	encoder := base64.NewEncoder(base64.URLEncoding, &buf)
+	if err := golomb.Encode(encoder, hashs, c.p); err != nil {
+		return nil, err
 	}
 
-	return url.QueryEscape(buf.String()), nil
+	if err := encoder.Close(); err != nil {
+		return nil, err
+	}
+
+	return &http.Cookie{
+		Name:  defaultCookieName,
+		Value: buf.String(),
+	}, nil
 }
 
 // decodeCookie reads cookie from http request and decode it to hash array.
@@ -134,12 +138,8 @@ func (c *Casper) decodeCookie(r *http.Request) ([]uint, error) {
 		return hashs, nil
 	}
 
-	value, err := url.QueryUnescape(cookie.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	hashs, err := golomb.DecodeAll([]byte(value), c.p)
+	decoder := base64.NewDecoder(base64.URLEncoding, strings.NewReader(cookie.Value))
+	hashs, err := golomb.DecodeAll(decoder, c.p)
 	if err != nil {
 		return nil, err
 	}

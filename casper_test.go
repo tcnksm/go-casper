@@ -6,19 +6,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"fmt"
-	"net/url"
-
 	"golang.org/x/net/http2"
 )
 
-func TestPush(t *testing.T) {
-	casper := New(1<<6, 10)
+func NewPushServer(t *testing.T, casper *Casper, content string) *httptest.Server {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		opts := &Options{
 			skipPush: true,
 		}
-		if err := casper.Push(w, r, "/static/example.jpg", opts); err != nil {
+		if err := casper.Push(w, r, content, opts); err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
 
@@ -32,6 +28,15 @@ func TestPush(t *testing.T) {
 	}
 	ts.TLS = ts.Config.TLSConfig
 	ts.StartTLS()
+
+	return ts
+}
+
+func TestPush(t *testing.T) {
+	casper := New(1<<6, 10)
+	content := "/static/example.jpg"
+
+	ts := NewPushServer(t, casper, content)
 	defer ts.Close()
 
 	tr := &http.Transport{
@@ -64,56 +69,62 @@ func TestPush(t *testing.T) {
 	}
 
 	cookies := res.Cookies()
-	var exist bool
-	for _, cookie := range cookies {
-		if cookie.Name == defaultCookieName {
-			exist = true
-			if got, want := cookie.Value, "%E5%00"; got != want {
-				t.Fatalf("Get cookie %q, want %q", got, want)
-			}
-		}
+	if got, want := cookies[0].Name, defaultCookieName; got != want {
+		t.Fatalf("Get cookie name %q, want %q", got, want)
 	}
 
-	if !exist {
-		t.Fatalf("cookie %q is not set", defaultCookieName)
+	if got, want := cookies[0].Value, "5QA="; got != want {
+		t.Fatalf("Get cookie value %q, want %q", got, want)
 	}
 }
 
+func TestPushWithCookie(t *testing.T) {
+}
+
 func TestGenerateCookie(t *testing.T) {
-	// TODO(tcnksm): Check this value is reasonable or not
-	want := "%16%D0%900O%3C%CE%B81%10"
-	contents := []string{
-		"/static/example1.jpg",
-		"/static/example2.jpg",
-		"/static/example3.jpg",
-		"/static/example4.jpg",
-		"/static/example5.jpg",
-		"/static/example6.jpg",
-		"/static/example7.jpg",
-		"/static/example8.jpg",
-		"/static/example9.jpg",
-		"/static/example10.jpg",
+
+	cases := []struct {
+		contents    []string
+		P           int
+		cookieValue string
+	}{
+		{
+			[]string{
+				"/static/example1.jpg",
+				"/static/example2.jpg",
+				"/static/example3.jpg",
+				"/static/example4.jpg",
+				"/static/example5.jpg",
+				"/static/example6.jpg",
+				"/static/example7.jpg",
+				"/static/example8.jpg",
+				"/static/example9.jpg",
+				"/static/example10.jpg",
+			},
+			1 << 6,
+			// Minimum number of bits is N*log(P)
+			// = 10 * log(1<<6) = 60 bits = 7.5bytes
+			"FtCQME88zrgxEA==", // 16 bytes
+		},
 	}
 
-	casper := New(1<<6, len(contents))
-	hashs := make([]uint, 0, len(contents))
+	for _, tc := range cases {
+		casper := New(tc.P, len(tc.contents))
 
-	for _, content := range contents {
-		hashs = append(hashs, casper.hash([]byte(content)))
+		hashs := make([]uint, 0, len(tc.contents))
+		for _, content := range tc.contents {
+			hashs = append(hashs, casper.hash([]byte(content)))
+		}
+
+		cookie, err := casper.generateCookie(hashs)
+		if err != nil {
+			t.Fatalf("generateCookie should not fail")
+		}
+
+		if got, want := cookie.Value, tc.cookieValue; got != want {
+			t.Fatalf("generateCookie=%q, want=%q", got, want)
+		}
 	}
-
-	got, err := casper.generateCookie(hashs)
-	if err != nil {
-		t.Fatalf("generateCookie should not fail")
-	}
-
-	if got != want {
-		t.Fatalf("generateCookie=%q, want=%q", got, want)
-	}
-
-	es, _ := url.QueryUnescape(got)
-	t.Log(fmt.Sprintf("%x", es))
-
 }
 
 func TestPush_ServerPushNotSupported(t *testing.T) {
