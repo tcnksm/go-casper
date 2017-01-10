@@ -78,7 +78,8 @@ func TestDecodeAll(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got, err := DecodeAll(tc.input, tc.p)
+		rd := bytes.NewReader(tc.input)
+		got, err := DecodeAll(rd, tc.p)
 		if err != nil {
 			t.Fatal(err)
 		}

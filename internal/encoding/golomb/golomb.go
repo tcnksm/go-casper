@@ -1,7 +1,6 @@
 package golomb
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"math"
@@ -12,10 +11,10 @@ import (
 var errPadding = errors.New("padding")
 
 // DecodeAll decodes...
-func DecodeAll(src []byte, p uint) ([]uint, error) {
+func DecodeAll(rd io.Reader, p uint) ([]uint, error) {
 	// TODO(tcnksm): Receive dst from outside as argument.
 	var dst []uint
-	br := bits.NewReader(bytes.NewReader(src))
+	br := bits.NewReader(rd)
 	prev := uint(0)
 	for {
 		v, err := decode(br, p)
