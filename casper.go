@@ -53,8 +53,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	// it's available or not first to avoid waste calc.
 	pusher, ok := w.(http.Pusher)
 	if !ok {
-		// go1.8 or later
-		return errors.New("server push is not supported")
+		return errors.New("server push is not supported") // go1.8 or later
 	}
 
 	hashs, err := c.decodeCookie(r)

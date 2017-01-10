@@ -79,6 +79,46 @@ func TestPush(t *testing.T) {
 }
 
 func TestPushWithCookie(t *testing.T) {
+	casper := New(1<<6, 10)
+	content := "/static/example.jpg"
+
+	ts := NewPushServer(t, casper, content)
+	defer ts.Close()
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	if err := http2.ConfigureTransport(tr); err != nil {
+		t.Fatalf("Failed to configure h2 transport: %s", err)
+	}
+
+	client := http.Client{
+		Transport: tr,
+	}
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cookie := &http.Cookie{
+		Name:  defaultCookieName,
+		Value: "5QA=",
+	}
+	req.AddCookie(cookie)
+
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+
+	if !casper.alreadyPushed {
+		t.Fatalf("%q should be cached", content)
+	}
 }
 
 func TestGenerateCookie(t *testing.T) {
