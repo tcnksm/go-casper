@@ -1,3 +1,0 @@
-BenchmarkWrite-4   	20000000	        66.3 ns/op	      16 B/op	       2 allocs/op
-PASS
-ok  	github.com/tcnksm/go-casper/internal/bits	1.403s
