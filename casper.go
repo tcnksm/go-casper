@@ -10,11 +10,11 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/tcnksm/go-casper/internal/encoding/golombset"
+	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
 
 const (
-	cookieName = "x-go-casper"
+	defaultCookieName = "x-go-casper"
 )
 
 // Casper stores
@@ -56,7 +56,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		return errors.New("server push is not supported")
 	}
 
-	hashs, err := c.readCookie(r)
+	hashs, err := c.decodeCookie(r)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	}
 
 	cookie := &http.Cookie{
-		Name:  cookieName,
+		Name:  defaultCookieName,
 		Value: cookieValue,
 	}
 	http.SetCookie(w, cookie)
@@ -88,8 +88,11 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	return nil
 }
 
-// hash generate hash value from the given bytes.
-// It's ok to use md5 since this is not for crypto.
+// hash generate a hash value from the given bytes for
+// n elements and p faslse positive probability.
+//
+// It's ok to use md5 since we just need a hash that generates
+// uniformally-distributed values for best results.
 func (c *Casper) hash(p []byte) uint {
 	h := md5.New()
 	h.Write(p)
@@ -111,16 +114,16 @@ func (c *Casper) generateCookie(hashs []uint) (string, error) {
 	})
 
 	var buf bytes.Buffer
-	if err := golombset.Encode(&buf, hashs, c.p); err != nil {
+	if err := golomb.Encode(&buf, hashs, c.p); err != nil {
 		return "", err
 	}
 
 	return url.QueryEscape(buf.String()), nil
 }
 
-// readCookie reads cookie from http request and decode it to hash array.
-func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
-	cookie, err := r.Cookie(cookieName)
+// decodeCookie reads cookie from http request and decode it to hash array.
+func (c *Casper) decodeCookie(r *http.Request) ([]uint, error) {
+	cookie, err := r.Cookie(defaultCookieName)
 	if err != nil && err != http.ErrNoCookie {
 		return nil, err
 	}
@@ -136,7 +139,7 @@ func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
 		return nil, err
 	}
 
-	hashs, err := golombset.DecodeAll([]byte(value), c.p)
+	hashs, err := golomb.DecodeAll([]byte(value), c.p)
 	if err != nil {
 		return nil, err
 	}

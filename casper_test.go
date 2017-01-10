@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"fmt"
+	"net/url"
+
 	"golang.org/x/net/http2"
 )
 
@@ -63,7 +66,7 @@ func TestPush(t *testing.T) {
 	cookies := res.Cookies()
 	var exist bool
 	for _, cookie := range cookies {
-		if cookie.Name == cookieName {
+		if cookie.Name == defaultCookieName {
 			exist = true
 			if got, want := cookie.Value, "%E5%00"; got != want {
 				t.Fatalf("Get cookie %q, want %q", got, want)
@@ -72,7 +75,7 @@ func TestPush(t *testing.T) {
 	}
 
 	if !exist {
-		t.Fatalf("cookie %q is not set", cookieName)
+		t.Fatalf("cookie %q is not set", defaultCookieName)
 	}
 }
 
@@ -107,6 +110,10 @@ func TestGenerateCookie(t *testing.T) {
 	if got != want {
 		t.Fatalf("generateCookie=%q, want=%q", got, want)
 	}
+
+	es, _ := url.QueryUnescape(got)
+	t.Log(fmt.Sprintf("%x", es))
+
 }
 
 func TestPush_ServerPushNotSupported(t *testing.T) {
