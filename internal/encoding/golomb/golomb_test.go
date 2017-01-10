@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -114,31 +115,20 @@ func TestEncoding(t *testing.T) {
 	}
 }
 
-// This test used data set from https://github.com/rasky/gcs
-func TestGlombSet(t *testing.T) {
+func ExampleGlombSet() {
+	// Number of elements and false positive probability.
+	//
+	// Minimum number of bits is N*log(P)
+	// = 26 * log(1<<6) = 156 bits = 19 bytes
+	N, P := uint(26), uint(1<<6)
 
-	cases := []struct {
-		input string
-		want  bool
-	}{
-		{"alpha", true},
-		{"hotel", true},
-		{"whiskey", true},
-		{"november", true},
-
-		{"Taichi", false},
-		{"Nakashima", false},
-	}
-
-	n, p := uint(26), uint(64)
+	// Example data set comes from https://github.com/rasky/gcs
 	file := "./testdata/words.nato"
-	f, err := os.Open(file)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f, _ := os.Open(file)
+	sc := bufio.NewScanner(f)
 	defer f.Close()
 
-	hashFunc := func(v []byte) uint {
+	hashF := func(v []byte) uint {
 		h := md5.New()
 		h.Write(v)
 		b := h.Sum(nil)
@@ -148,15 +138,13 @@ func TestGlombSet(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		return uint(i) % (n * p)
+		return uint(i) % (N * P)
 	}
 
-	sc := bufio.NewScanner(f)
-	a := make([]uint, 0, n)
+	a := make([]uint, 0, N)
 	for sc.Scan() {
-		a = append(a, hashFunc(sc.Bytes()))
+		a = append(a, hashF(sc.Bytes()))
 	}
-
 	sort.Slice(a, func(i, j int) bool {
 		return a[i] < a[j]
 	})
@@ -164,33 +152,8 @@ func TestGlombSet(t *testing.T) {
 	// Encode hash value array to Golomb-coded sets
 	// and write it to buffer.
 	var buf bytes.Buffer
-	if err := Encode(&buf, a, p); err != nil {
-		t.Fatal(err)
-	}
+	Encode(&buf, a, P)
 
-	// DecodeAll
-	decoded, err := DecodeAll(buf.Bytes(), p)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, tc := range cases {
-		if got := search(decoded, hashFunc([]byte(tc.input))); got != tc.want {
-			t.Errorf("Search(%s)=%t, want=%t", tc.input, got, tc.want)
-		}
-	}
-}
-
-func search(a []uint, h uint) bool {
-	// TODO(tcnksm): Binary search
-	for i := 0; i < len(a); i++ {
-		if h == a[i] {
-			return true
-		}
-
-		if h < a[i] {
-			return false
-		}
-	}
-	return false
+	fmt.Printf("%x", buf.Bytes())
+	// Output: cba920f780663a061f2065198ab1032d624c50331e66ae9818
 }
