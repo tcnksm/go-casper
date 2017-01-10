@@ -2,6 +2,7 @@ package casper
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -14,8 +15,12 @@ import (
 	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
 
+type contextKey string
+
 const (
-	defaultCookieName = "x-go-casper"
+	cookieName = "x-go-casper"
+
+	key contextKey = "casperHash"
 )
 
 // Casper stores
@@ -48,39 +53,52 @@ func New(p, n int) *Casper {
 }
 
 // Push pushes the given content and set cookie value.
-func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, opts *Options) error {
+func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, opts *Options) (*http.Request, error) {
 	// Pusher is used later in this function but should check
-	// it's available or not first to avoid waste calc.
+	// it's available or not first to avoid unnessary calc.
 	pusher, ok := w.(http.Pusher)
 	if !ok {
-		return errors.New("server push is not supported") // go1.8 or later
+		return r, errors.New("server push is not supported") // go1.8 or later
 	}
 
-	hashs, err := c.decodeCookie(r)
+	if v := w.Header().Get("Set-Cookie"); len(v) != 0 {
+		// TODO(tcnksm): Other cookie may exist
+		w.Header().Del("Set-Cookie")
+	}
+
+	hashs, err := c.readCookie(r)
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	h := c.hash([]byte(content))
 	if search(hashs, h) {
 		c.alreadyPushed = true
-		return nil
+
+		cookie, err := r.Cookie(cookieName)
+		if err != nil {
+			return r, err
+		}
+		http.SetCookie(w, cookie)
+
+		return r, nil
 	}
 
 	if !opts.skipPush {
 		if err := pusher.Push(content, opts.PushOptions); err != nil {
-			return err
+			return r, err
 		}
 	}
 
 	hashs = append(hashs, h)
 	cookie, err := c.generateCookie(hashs)
 	if err != nil {
-		return err
+		return r, err
 	}
 	http.SetCookie(w, cookie)
 
-	return nil
+	// TODO(tcnksm): Define function to set value
+	return r.WithContext(context.WithValue(r.Context(), key, hashs)), nil
 }
 
 // hash generate a hash value from the given bytes for
@@ -119,14 +137,23 @@ func (c *Casper) generateCookie(hashs []uint) (*http.Cookie, error) {
 	}
 
 	return &http.Cookie{
-		Name:  defaultCookieName,
+		Name:  cookieName,
 		Value: buf.String(),
 	}, nil
 }
 
-// decodeCookie reads cookie from http request and decode it to hash array.
-func (c *Casper) decodeCookie(r *http.Request) ([]uint, error) {
-	cookie, err := r.Cookie(defaultCookieName)
+// readCookie reads cookie from http request and decode it to hash array.
+func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
+
+	// TODO(tcnksm): Should not be here
+	// TODO(tcnksm): Define function to get value
+	ctx := r.Context()
+	if v := ctx.Value(key); v != nil {
+		hashs := v.([]uint)
+		return hashs, nil
+	}
+
+	cookie, err := r.Cookie(cookieName)
 	if err != nil && err != http.ErrNoCookie {
 		return nil, err
 	}
