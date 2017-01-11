@@ -28,11 +28,10 @@ type Casper struct {
 	p uint
 	n uint
 
-	// inMemory decide executes actual server push or fakely push
-	// to in memory buffer(buf). This should be only used in testing.
+	// inMemory decides executing actual server push or fakely push
+	// to in memory buffer(buf) for testing. This should be true only in testing.
 	//
 	// Currently, it's kinda hard to receive http push in go http client.
-	// Set this and ignore pushing and only test cookie part.
 	// This should be removed in future.
 	inMemory bool
 	buf      []string
@@ -60,7 +59,7 @@ func New(p, n int) *Casper {
 }
 
 // Push pushes the given content and set cookie value.
-func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, opts *Options) (*http.Request, error) {
+func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string, opts *Options) (*http.Request, error) {
 	// Pusher is used later in this function but should check
 	// it's available or not first to avoid unnessary calc.
 	pusher, ok := w.(http.Pusher)
@@ -90,27 +89,26 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		}
 	}
 
-	h := c.hash([]byte(content))
-	if search(hashValues, h) {
-		cookie, err := r.Cookie(cookieName)
-		if err != nil {
-			return r, err
+	// Push contents one by one.
+	for _, content := range contents {
+		h := c.hash([]byte(content))
+		if search(hashValues, h) {
+			continue
 		}
-		http.SetCookie(w, cookie)
 
-		return r, nil
+		if c.inMemory {
+			// Push to in memory buffer. This is only for testing.
+			c.buf = append(c.buf, content)
+		} else {
+			if err := pusher.Push(content, opts.PushOptions); err != nil {
+				return r, err
+			}
+		}
+
+		hashValues = append(hashValues, h)
 	}
 
-	if c.inMemory {
-		// Push to in memory buffer this is only for testing.
-		c.buf = append(c.buf, content)
-	} else {
-		if err := pusher.Push(content, opts.PushOptions); err != nil {
-			return r, err
-		}
-	}
-
-	hashValues = append(hashValues, h)
+	// TODO(tcnksm): Can be skip when nothing is pushed.
 	cookie, err := c.generateCookie(hashValues)
 	if err != nil {
 		return r, err

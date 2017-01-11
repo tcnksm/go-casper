@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/http2"
 )
 
-func NewPushServer(t *testing.T, casper *Casper, content string) *httptest.Server {
+func NewPushServer(t *testing.T, casper *Casper, contents []string) *httptest.Server {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		http.SetCookie(w, &http.Cookie{
@@ -19,7 +19,7 @@ func NewPushServer(t *testing.T, casper *Casper, content string) *httptest.Serve
 		})
 
 		opts := &Options{}
-		if _, err := casper.Push(w, r, content, opts); err != nil {
+		if _, err := casper.Push(w, r, contents, opts); err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
 
@@ -58,9 +58,7 @@ func TestPush(t *testing.T) {
 	casper := New(1<<6, 10)
 	casper.inMemory = true
 
-	content := "/static/example.jpg"
-
-	ts := NewPushServer(t, casper, content)
+	ts := NewPushServer(t, casper, []string{"/static/example.jpg"})
 	defer ts.Close()
 
 	req, err := http.NewRequest("GET", ts.URL, nil)
@@ -105,9 +103,7 @@ func TestPushWithCookie(t *testing.T) {
 	casper := New(1<<6, 10)
 	casper.inMemory = true
 
-	content := "/static/example.jpg"
-
-	ts := NewPushServer(t, casper, content)
+	ts := NewPushServer(t, casper, []string{"/static/example.jpg"})
 	defer ts.Close()
 
 	req, err := http.NewRequest("GET", ts.URL, nil)
@@ -169,12 +165,7 @@ func TestPushMultipleContents(t *testing.T) {
 		}
 		opts := &Options{}
 
-		r, err := casper.Push(w, r, contents[0], opts)
-		if err != nil {
-			t.Fatalf("Push failed: %s", err)
-		}
-
-		r, err = casper.Push(w, r, contents[1], opts)
+		_, err := casper.Push(w, r, contents, opts)
 		if err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
@@ -279,7 +270,7 @@ func TestPush_ServerPushNotSupported(t *testing.T) {
 	var err error
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cspr := New(1<<6, 10)
-		_, err = cspr.Push(w, r, "/static/example.jpg", nil)
+		_, err = cspr.Push(w, r, []string{"/static/example.jpg"}, nil)
 	}))
 	defer ts.Close()
 

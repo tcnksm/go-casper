@@ -4,10 +4,8 @@ Golang implementation of CASPer (cache-aware server-push)
 
 ## TODO
 
-- [ ] Support multiple pushes (in one request)
 - [ ] Add cookie option 
 - [ ] Allow to configure cookie
-- [ ] Etag?
 - [ ] Documentation 
 - [ ] Add Benchmark
 
