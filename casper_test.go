@@ -18,9 +18,7 @@ func NewPushServer(t *testing.T, casper *Casper, content string) *httptest.Serve
 			Path:  "/",
 		})
 
-		opts := &Options{
-			skipPush: true,
-		}
+		opts := &Options{}
 		if _, err := casper.Push(w, r, content, opts); err != nil {
 			t.Fatalf("Push failed: %s", err)
 		}
@@ -56,7 +54,10 @@ func h2Client(t *testing.T) *http.Client {
 }
 
 func TestPush(t *testing.T) {
+
 	casper := New(1<<6, 10)
+	casper.inMemory = true
+
 	content := "/static/example.jpg"
 
 	ts := NewPushServer(t, casper, content)
@@ -74,8 +75,8 @@ func TestPush(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if casper.alreadyPushed {
-		t.Fatalf("content should not be already pushed")
+	if got, want := len(casper.buf), 1; got != want {
+		t.Fatalf("number of pushed contents %d, want %d", got, want)
 	}
 
 	cookies := res.Cookies()
@@ -102,6 +103,8 @@ func TestPush(t *testing.T) {
 
 func TestPushWithCookie(t *testing.T) {
 	casper := New(1<<6, 10)
+	casper.inMemory = true
+
 	content := "/static/example.jpg"
 
 	ts := NewPushServer(t, casper, content)
@@ -125,8 +128,8 @@ func TestPushWithCookie(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if !casper.alreadyPushed {
-		t.Fatalf("%q should be cached", content)
+	if got, want := len(casper.buf), 0; got != want {
+		t.Fatalf("number of pushed contents %d, want %d", got, want)
 	}
 
 	cookies := res.Cookies()
@@ -157,14 +160,14 @@ func TestPushWithCookie(t *testing.T) {
 
 func TestPushMultipleContents(t *testing.T) {
 	casper := New(1<<6, 2)
+	casper.inMemory = true
+
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		contents := []string{
 			"/js/jquery-1.9.1.min.js",
 			"/assets/style.css",
 		}
-		opts := &Options{
-			skipPush: true,
-		}
+		opts := &Options{}
 
 		r, err := casper.Push(w, r, contents[0], opts)
 		if err != nil {
@@ -199,8 +202,8 @@ func TestPushMultipleContents(t *testing.T) {
 	}
 	defer res.Body.Close()
 
-	if casper.alreadyPushed {
-		t.Fatalf("content should not be already pushed")
+	if got, want := len(casper.buf), 2; got != want {
+		t.Fatalf("number of pushed contents %d, want %d", got, want)
 	}
 
 	cookies := res.Cookies()

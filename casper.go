@@ -28,22 +28,19 @@ type Casper struct {
 	p uint
 	n uint
 
-	// alreadyPushed is true when the request cookie indicates
-	// the given content is already pushed.
-	alreadyPushed bool
+	// inMemory decide executes actual server push or fakely push
+	// to in memory buffer(buf). This should be only used in testing.
+	//
+	// Currently, it's kinda hard to receive http push in go http client.
+	// Set this and ignore pushing and only test cookie part.
+	// This should be removed in future.
+	inMemory bool
+	buf      []string
 }
 
 // Options includes casper push options.
 type Options struct {
 	*http.PushOptions
-
-	// skipPush skips server pushing. This should be only used in testing.
-	// Currently, it's kinda hard to receive http push in go http client.
-	// Set this and ignore pushing and only test cookie part.
-	// This should be removed in future.
-	//
-	// TODO(tcnksm): Inmemory push
-	skipPush bool
 }
 
 type contextKey struct {
@@ -95,7 +92,6 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 
 	h := c.hash([]byte(content))
 	if search(hashValues, h) {
-		c.alreadyPushed = true
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
 			return r, err
@@ -105,7 +101,10 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		return r, nil
 	}
 
-	if !opts.skipPush {
+	if c.inMemory {
+		// Push to in memory buffer this is only for testing.
+		c.buf = append(c.buf, content)
+	} else {
 		if err := pusher.Push(content, opts.PushOptions); err != nil {
 			return r, err
 		}
