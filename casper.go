@@ -41,6 +41,8 @@ type Options struct {
 	// Currently, it's kinda hard to receive http push in go http client.
 	// Set this and ignore pushing and only test cookie part.
 	// This should be removed in future.
+	//
+	// TODO(tcnksm): Inmemory push
 	skipPush bool
 }
 
@@ -69,9 +71,15 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		return r, errors.New("server push is not supported") // go1.8 or later
 	}
 
-	if v := w.Header().Get("Set-Cookie"); len(v) != 0 {
-		// TODO(tcnksm): Delete only casper cookie
+	// Remove casper cookie header if it's already exists.
+	if cookies, ok := w.Header()["Set-Cookie"]; ok && len(cookies) != 0 {
 		w.Header().Del("Set-Cookie")
+		for _, cookieStr := range cookies {
+			if strings.Contains(cookieStr, cookieName+"=") {
+				continue
+			}
+			w.Header().Add("Set-Cookie", cookieStr)
+		}
 	}
 
 	// Get hash values assosiated with previous parent context.
@@ -88,8 +96,6 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	h := c.hash([]byte(content))
 	if search(hashValues, h) {
 		c.alreadyPushed = true
-
-		// TODO(tcnksm): set only casper cookie
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
 			return r, err

@@ -11,6 +11,13 @@ import (
 
 func NewPushServer(t *testing.T, casper *Casper, content string) *httptest.Server {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		http.SetCookie(w, &http.Cookie{
+			Name:  "session",
+			Value: "19881124",
+			Path:  "/",
+		})
+
 		opts := &Options{
 			skipPush: true,
 		}
@@ -72,15 +79,23 @@ func TestPush(t *testing.T) {
 	}
 
 	cookies := res.Cookies()
-	if got, want := len(cookies), 1; got != want {
+	if got, want := len(cookies), 2; got != want {
 		t.Fatalf("Number of cookie %d, want %d", got, want)
 	}
 
-	if got, want := cookies[0].Name, cookieName; got != want {
+	if got, want := cookies[0].Name, "session"; got != want {
 		t.Fatalf("Get cookie name %q, want %q", got, want)
 	}
 
-	if got, want := cookies[0].Value, "5QA="; got != want {
+	if got, want := cookies[0].Value, "19881124"; got != want {
+		t.Fatalf("Get cookie value %q, want %q", got, want)
+	}
+
+	if got, want := cookies[1].Name, cookieName; got != want {
+		t.Fatalf("Get cookie name %q, want %q", got, want)
+	}
+
+	if got, want := cookies[1].Value, "5QA="; got != want {
 		t.Fatalf("Get cookie value %q, want %q", got, want)
 	}
 }
@@ -115,15 +130,27 @@ func TestPushWithCookie(t *testing.T) {
 	}
 
 	cookies := res.Cookies()
-	if got, want := len(cookies), 1; got != want {
+	if got, want := len(cookies), 2; got != want {
 		t.Fatalf("Number of cookie %d, want %d", got, want)
 	}
 
-	if got, want := cookies[0].Name, cookieName; got != want {
+	if got, want := len(cookies), 2; got != want {
+		t.Fatalf("Number of cookie %d, want %d", got, want)
+	}
+
+	if got, want := cookies[0].Name, "session"; got != want {
 		t.Fatalf("Get cookie name %q, want %q", got, want)
 	}
 
-	if got, want := cookies[0].Value, "5QA="; got != want {
+	if got, want := cookies[0].Value, "19881124"; got != want {
+		t.Fatalf("Get cookie value %q, want %q", got, want)
+	}
+
+	if got, want := cookies[1].Name, cookieName; got != want {
+		t.Fatalf("Get cookie name %q, want %q", got, want)
+	}
+
+	if got, want := cookies[1].Value, "5QA="; got != want {
 		t.Fatalf("Get cookie value %q, want %q", got, want)
 	}
 }
