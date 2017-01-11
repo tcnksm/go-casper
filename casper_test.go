@@ -229,12 +229,12 @@ func TestGenerateCookie(t *testing.T) {
 	for _, tc := range cases {
 		casper := New(tc.P, len(tc.contents))
 
-		hashs := make([]uint, 0, len(tc.contents))
+		hashValues := make([]uint, 0, len(tc.contents))
 		for _, content := range tc.contents {
-			hashs = append(hashs, casper.hash([]byte(content)))
+			hashValues = append(hashValues, casper.hash([]byte(content)))
 		}
 
-		cookie, err := casper.generateCookie(hashs)
+		cookie, err := casper.generateCookie(hashValues)
 		if err != nil {
 			t.Fatalf("generateCookie should not fail")
 		}

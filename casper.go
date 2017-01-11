@@ -15,12 +15,12 @@ import (
 	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
 
-type contextKey string
-
 const (
 	cookieName = "x-go-casper"
+)
 
-	key contextKey = "casperHash"
+var (
+	hashContextkey = &contextKey{"casper-hash"}
 )
 
 // Casper stores
@@ -44,6 +44,14 @@ type Options struct {
 	skipPush bool
 }
 
+type contextKey struct {
+	name string
+}
+
+func (c *contextKey) String() string {
+	return c.name
+}
+
 // New initialize casper.
 func New(p, n int) *Casper {
 	return &Casper{
@@ -62,19 +70,26 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 	}
 
 	if v := w.Header().Get("Set-Cookie"); len(v) != 0 {
-		// TODO(tcnksm): Other cookie may exist
+		// TODO(tcnksm): Delete only casper cookie
 		w.Header().Del("Set-Cookie")
 	}
 
-	hashs, err := c.readCookie(r)
-	if err != nil {
-		return r, err
+	// Get hash values assosiated with previous parent context.
+	// If none, then read it from the request cookie.
+	hashValues := contextHashValues(r.Context())
+	if hashValues == nil {
+		var err error
+		hashValues, err = c.readCookie(r)
+		if err != nil {
+			return r, err
+		}
 	}
 
 	h := c.hash([]byte(content))
-	if search(hashs, h) {
+	if search(hashValues, h) {
 		c.alreadyPushed = true
 
+		// TODO(tcnksm): set only casper cookie
 		cookie, err := r.Cookie(cookieName)
 		if err != nil {
 			return r, err
@@ -90,15 +105,14 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, content string, op
 		}
 	}
 
-	hashs = append(hashs, h)
-	cookie, err := c.generateCookie(hashs)
+	hashValues = append(hashValues, h)
+	cookie, err := c.generateCookie(hashValues)
 	if err != nil {
 		return r, err
 	}
 	http.SetCookie(w, cookie)
 
-	// TODO(tcnksm): Define function to set value
-	return r.WithContext(context.WithValue(r.Context(), key, hashs)), nil
+	return r.WithContext(withHashValues(r.Context(), hashValues)), nil
 }
 
 // hash generate a hash value from the given bytes for
@@ -119,16 +133,17 @@ func (c *Casper) hash(p []byte) uint {
 	return uint(i) % (c.n * c.p)
 }
 
-// generateCookie generates cookie value from the given hash array.
-func (c *Casper) generateCookie(hashs []uint) (*http.Cookie, error) {
+// generateCookie generates cookie from the given hash values.
+func (c *Casper) generateCookie(hashValues []uint) (*http.Cookie, error) {
 
-	sort.Slice(hashs, func(i, j int) bool {
-		return hashs[i] < hashs[j]
+	// golomb encoder expect the given array is sorted.
+	sort.Slice(hashValues, func(i, j int) bool {
+		return hashValues[i] < hashValues[j]
 	})
 
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.URLEncoding, &buf)
-	if err := golomb.Encode(encoder, hashs, c.p); err != nil {
+	if err := golomb.Encode(encoder, hashValues, c.p); err != nil {
 		return nil, err
 	}
 
@@ -144,35 +159,41 @@ func (c *Casper) generateCookie(hashs []uint) (*http.Cookie, error) {
 
 // readCookie reads cookie from http request and decode it to hash array.
 func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
-
-	// TODO(tcnksm): Should not be here
-	// TODO(tcnksm): Define function to get value
-	ctx := r.Context()
-	if v := ctx.Value(key); v != nil {
-		hashs := v.([]uint)
-		return hashs, nil
-	}
-
 	cookie, err := r.Cookie(cookieName)
 	if err != nil && err != http.ErrNoCookie {
 		return nil, err
 	}
 
 	if err == http.ErrNoCookie {
-		// TODO(tcnksm): Set size
-		var hashs []uint
-		return hashs, nil
+		hashValues := make([]uint, 0, c.n)
+		return hashValues, nil
 	}
 
+	// Decode golomb coded cookie value to original hash values array.
 	decoder := base64.NewDecoder(base64.URLEncoding, strings.NewReader(cookie.Value))
-	hashs, err := golomb.DecodeAll(decoder, c.p)
+	hashValues, err := golomb.DecodeAll(decoder, c.p)
 	if err != nil {
 		return nil, err
 	}
 
-	return hashs, nil
+	return hashValues, nil
 }
 
+// withHashValues returns a new context based on previsous parent context.
+// It sets hashValues which is used for generating golomb encoded cookie value.
+func withHashValues(parent context.Context, hashValues []uint) context.Context {
+	return context.WithValue(parent, hashContextkey, hashValues)
+}
+
+// contextHashValues returns the hashValues assosiated with the
+// provided context. If none, it returns nil,
+func contextHashValues(ctx context.Context) []uint {
+	hashValues, _ := ctx.Value(hashContextkey).([]uint)
+	return hashValues
+}
+
+// search looks up the provided slices contains the given value.
+//
 // TODO(tcnksm): binary search (or enable to configure?)
 func search(a []uint, h uint) bool {
 	for i := 0; i < len(a); i++ {
