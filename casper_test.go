@@ -4,216 +4,13 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"golang.org/x/net/http2"
 )
 
-func NewPushServer(t *testing.T, casper *Casper, contents []string) *httptest.Server {
-	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		http.SetCookie(w, &http.Cookie{
-			Name:  "session",
-			Value: "19881124",
-			Path:  "/",
-		})
-
-		opts := &Options{}
-		if _, err := casper.Push(w, r, contents, opts); err != nil {
-			t.Fatalf("Push failed: %s", err)
-		}
-
-		w.Header().Add("Content-Type", "text/html")
-		w.Write([]byte(""))
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	if err := http2.ConfigureServer(ts.Config, nil); err != nil {
-		t.Fatalf("Failed to configure h2 server: %s", err)
-	}
-	ts.TLS = ts.Config.TLSConfig
-	ts.StartTLS()
-
-	return ts
-}
-
-func h2Client(t *testing.T) *http.Client {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	if err := http2.ConfigureTransport(tr); err != nil {
-		t.Fatalf("Failed to configure h2 transport: %s", err)
-	}
-
-	return &http.Client{
-		Transport: tr,
-	}
-}
-
-func TestPush(t *testing.T) {
-
-	casper := New(1<<6, 10)
-	casper.inMemory = true
-
-	ts := NewPushServer(t, casper, []string{"/static/example.jpg"})
-	defer ts.Close()
-
-	req, err := http.NewRequest("GET", ts.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client := h2Client(t)
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	if got, want := len(casper.buf), 1; got != want {
-		t.Fatalf("number of pushed contents %d, want %d", got, want)
-	}
-
-	cookies := res.Cookies()
-	if got, want := len(cookies), 2; got != want {
-		t.Fatalf("Number of cookie %d, want %d", got, want)
-	}
-
-	if got, want := cookies[0].Name, "session"; got != want {
-		t.Fatalf("Get cookie name %q, want %q", got, want)
-	}
-
-	if got, want := cookies[0].Value, "19881124"; got != want {
-		t.Fatalf("Get cookie value %q, want %q", got, want)
-	}
-
-	if got, want := cookies[1].Name, cookieName; got != want {
-		t.Fatalf("Get cookie name %q, want %q", got, want)
-	}
-
-	if got, want := cookies[1].Value, "5QA="; got != want {
-		t.Fatalf("Get cookie value %q, want %q", got, want)
-	}
-}
-
-func TestPushWithCookie(t *testing.T) {
-	casper := New(1<<6, 10)
-	casper.inMemory = true
-
-	ts := NewPushServer(t, casper, []string{"/static/example.jpg"})
-	defer ts.Close()
-
-	req, err := http.NewRequest("GET", ts.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cookie := &http.Cookie{
-		Name:  cookieName,
-		Value: "5QA=",
-	}
-	req.AddCookie(cookie)
-
-	client := h2Client(t)
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	if got, want := len(casper.buf), 0; got != want {
-		t.Fatalf("number of pushed contents %d, want %d", got, want)
-	}
-
-	cookies := res.Cookies()
-	if got, want := len(cookies), 2; got != want {
-		t.Fatalf("Number of cookie %d, want %d", got, want)
-	}
-
-	if got, want := len(cookies), 2; got != want {
-		t.Fatalf("Number of cookie %d, want %d", got, want)
-	}
-
-	if got, want := cookies[0].Name, "session"; got != want {
-		t.Fatalf("Get cookie name %q, want %q", got, want)
-	}
-
-	if got, want := cookies[0].Value, "19881124"; got != want {
-		t.Fatalf("Get cookie value %q, want %q", got, want)
-	}
-
-	if got, want := cookies[1].Name, cookieName; got != want {
-		t.Fatalf("Get cookie name %q, want %q", got, want)
-	}
-
-	if got, want := cookies[1].Value, "5QA="; got != want {
-		t.Fatalf("Get cookie value %q, want %q", got, want)
-	}
-}
-
-func TestPushMultipleContents(t *testing.T) {
-	casper := New(1<<6, 2)
-	casper.inMemory = true
-
-	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		contents := []string{
-			"/js/jquery-1.9.1.min.js",
-			"/assets/style.css",
-		}
-		opts := &Options{}
-
-		_, err := casper.Push(w, r, contents, opts)
-		if err != nil {
-			t.Fatalf("Push failed: %s", err)
-		}
-
-		w.Header().Add("Content-Type", "text/html")
-		w.Write([]byte(""))
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	if err := http2.ConfigureServer(ts.Config, nil); err != nil {
-		t.Fatalf("Failed to configure h2 server: %s", err)
-	}
-	ts.TLS = ts.Config.TLSConfig
-	ts.StartTLS()
-
-	req, err := http.NewRequest("GET", ts.URL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client := h2Client(t)
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-
-	if got, want := len(casper.buf), 2; got != want {
-		t.Fatalf("number of pushed contents %d, want %d", got, want)
-	}
-
-	cookies := res.Cookies()
-	if got, want := len(cookies), 1; got != want {
-		t.Fatalf("Number of cookie %d, want %d", got, want)
-	}
-
-	if got, want := cookies[0].Name, cookieName; got != want {
-		t.Fatalf("Get cookie name %q, want %q", got, want)
-	}
-
-	if got, want := cookies[0].Value, "gU4="; got != want {
-		t.Fatalf("Get cookie value %q, want %q", got, want)
-	}
-
-}
-
 func TestGenerateCookie(t *testing.T) {
-
 	cases := []struct {
 		contents    []string
 		P           int
@@ -221,12 +18,45 @@ func TestGenerateCookie(t *testing.T) {
 	}{
 		{
 			[]string{
+				"/static/example.jpg",
+			},
+			1 << 6,
+			"KA",
+		},
+
+		{
+			[]string{
 				"/js/jquery-1.9.1.min.js",
 				"/assets/style.css",
 			},
 			1 << 6,
-			"gU4=",
+			"gU4",
 		},
+
+		{
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			1 << 6,
+			"gU54MA",
+		},
+
+		{
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			1 << 10,
+			"MMOJEkWo",
+		},
+
+		// See how long cookie is when push many files.
+		// Minimum number of bits is N*log(P) = 20 * log(1<<6) = 120 bits = 15bytes
 		{
 			[]string{
 				"/static/example1.jpg",
@@ -239,11 +69,19 @@ func TestGenerateCookie(t *testing.T) {
 				"/static/example8.jpg",
 				"/static/example9.jpg",
 				"/static/example10.jpg",
+				"/static/example11.jpg",
+				"/static/example12.jpg",
+				"/static/example13.jpg",
+				"/static/example14.jpg",
+				"/static/example15.jpg",
+				"/static/example16.jpg",
+				"/static/example17.jpg",
+				"/static/example18.jpg",
+				"/static/example19.jpg",
+				"/static/example20.jpg",
 			},
 			1 << 6,
-			// Minimum number of bits is N*log(P)
-			// = 10 * log(1<<6) = 60 bits = 7.5bytes
-			"FtCQME88zrgxEA==", // 16 bytes
+			"FmDhUxQHeuwQYINoQrxmr1g_iw", // 26bytes
 		},
 	}
 
@@ -266,6 +104,240 @@ func TestGenerateCookie(t *testing.T) {
 	}
 }
 
+func TestPush(t *testing.T) {
+	cases := []struct {
+		p        int
+		push     []string
+		sameTime bool
+
+		clientCookie *http.Cookie
+		serverCookie *http.Cookie
+
+		casperCookie *http.Cookie
+		pushed       []string
+	}{
+		{
+			1 << 6,
+			[]string{"/static/example.jpg"},
+			false,
+			nil,
+			nil,
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "KA",
+				Raw:   "x-go-casper=KA",
+			},
+			[]string{"/static/example.jpg"},
+		},
+
+		{
+			1 << 6,
+			[]string{"/static/example.jpg"},
+			true, // push one by one
+			nil,
+			nil,
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "KA",
+				Raw:   "x-go-casper=KA",
+			},
+			[]string{"/static/example.jpg"},
+		},
+
+		{
+			1 << 6,
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			false,
+			nil,
+			nil,
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU54MA",
+				Raw:   "x-go-casper=gU54MA",
+			},
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+		},
+
+		// With additional server side cookies
+		{
+			1 << 6,
+			[]string{"/static/example.jpg"},
+			false,
+			nil,
+			&http.Cookie{
+				Name:  "session",
+				Value: "BAh7CiIKZmxhc2hJ",
+				Path:  "/",
+			},
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "KA",
+				Raw:   "x-go-casper=KA",
+			},
+			[]string{"/static/example.jpg"},
+		},
+
+		// With client side cookies
+		{
+			1 << 6,
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			false,
+
+			// This cookie is generated by /js/jquery-1.9.1.min.js and /assets/style.css
+			// This means these are already pushed on previous request and should not
+			// be pushed this time.
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU4",
+			},
+			nil,
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU54MA",
+				Raw:   "x-go-casper=gU54MA",
+			},
+			[]string{
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+		},
+
+		{
+			1 << 6,
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			true, // push one by one
+
+			// This cookie is generated by /js/jquery-1.9.1.min.js and /assets/style.css
+			// This means these are already pushed on previous request and should not
+			// be pushed this time.
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU4",
+			},
+			nil,
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU54MA",
+				Raw:   "x-go-casper=gU54MA",
+			},
+			[]string{
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+		},
+
+		// With server and client cookies
+		{
+			1 << 6,
+			[]string{
+				"/js/jquery-1.9.1.min.js",
+				"/assets/style.css",
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+			false,
+
+			// This cookie is generated by /js/jquery-1.9.1.min.js and /assets/style.css
+			// This means these are already pushed on previous request and should not
+			// be pushed this time.
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU4",
+			},
+
+			&http.Cookie{
+				Name:  "session",
+				Value: "BAh7CiIKZmxhc2hJ",
+				Path:  "/",
+			},
+
+			&http.Cookie{
+				Name:  cookieName,
+				Value: "gU54MA",
+				Raw:   "x-go-casper=gU54MA",
+			},
+			[]string{
+				"/static/logo.jpg",
+				"/static/cover.jpg",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		pusher := New(tc.p, len(tc.push))
+		pusher.inMemory = true
+
+		testServer := newTestServer(t, pusher, tc.push, tc.sameTime, tc.serverCookie)
+		defer testServer.Close()
+
+		req, err := http.NewRequest("GET", testServer.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if tc.clientCookie != nil {
+			req.AddCookie(tc.clientCookie)
+		}
+
+		client := newTestH2Client(t)
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		// Inspect in memory buffer
+		if got, want := len(pusher.buf), len(tc.pushed); got != want {
+			t.Fatalf("number of pushed contents %d, want %d", got, want)
+		}
+
+		if got, want := pusher.buf, tc.pushed; !reflect.DeepEqual(got, want) {
+			t.Fatalf("number of pushed contents %v, want %v", got, want)
+		}
+
+		// Inspect cookies to be returned from server.
+		wantCookie := 1
+		if tc.serverCookie != nil {
+			wantCookie = 2
+		}
+
+		cookies := res.Cookies()
+		if got, want := len(cookies), wantCookie; got != want {
+			t.Fatalf("Number of cookie %d, want %d", got, want)
+		}
+
+		if got, want := cookies[wantCookie-1], tc.casperCookie; !reflect.DeepEqual(got, want) {
+			t.Fatalf("Get cookie name %#v, want %#v", got, want)
+		}
+	}
+}
+
 func TestPush_ServerPushNotSupported(t *testing.T) {
 	var err error
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -278,5 +350,60 @@ func TestPush_ServerPushNotSupported(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expect to be failed") // TODO(tcnksm): define error
+	}
+}
+
+func newTestServer(t *testing.T, casper *Casper, contents []string, sameTime bool, cookie *http.Cookie) *httptest.Server {
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		// Set additinal cookie if provided.
+		if cookie != nil {
+			http.SetCookie(w, cookie)
+		}
+
+		opts := &Options{}
+		if sameTime {
+			// Push all contents at same time
+			if _, err := casper.Push(w, r, contents, opts); err != nil {
+				t.Fatalf("Push failed: %s", err)
+			}
+		} else {
+			// Push contents one by one. Test for context.
+			for _, content := range contents {
+				var err error
+				r, err = casper.Push(w, r, []string{content}, opts)
+				if err != nil {
+					t.Fatalf("Push failed: %s", err)
+				}
+			}
+		}
+
+		w.Header().Add("Content-Type", "text/html")
+		w.Write([]byte(""))
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	if err := http2.ConfigureServer(ts.Config, nil); err != nil {
+		t.Fatalf("Failed to configure h2 server: %s", err)
+	}
+	ts.TLS = ts.Config.TLSConfig
+	ts.StartTLS()
+
+	return ts
+}
+
+func newTestH2Client(t *testing.T) *http.Client {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+
+	if err := http2.ConfigureTransport(tr); err != nil {
+		t.Fatalf("Failed to configure h2 transport: %s", err)
+	}
+
+	return &http.Client{
+		Transport: tr,
 	}
 }
