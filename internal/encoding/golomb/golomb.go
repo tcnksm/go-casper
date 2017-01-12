@@ -5,6 +5,8 @@ import (
 	"io"
 	"math"
 
+	"fmt"
+
 	"github.com/tcnksm/go-casper/internal/bits"
 )
 
@@ -44,6 +46,13 @@ func decode(br *bits.Reader, p uint) (uint, error) {
 	// Decode unary parts. Sum p until enconter 0 bits.
 	for {
 		b, err := br.Read(1)
+		if err == io.EOF {
+			if v == 0 {
+				return 0, errPadding
+			}
+			return 0, fmt.Errorf("unexpected bit format")
+		}
+
 		if err != nil {
 			return 0, err
 		}

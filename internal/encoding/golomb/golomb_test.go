@@ -75,6 +75,12 @@ func TestDecodeAll(t *testing.T) {
 			1 << 5,
 			[]uint{75, 154},
 		},
+
+		{
+			[]byte{0x81, 0x4e},
+			1 << 6,
+			[]uint{65, 104},
+		},
 	}
 
 	for _, tc := range cases {
@@ -101,6 +107,12 @@ func TestEncoding(t *testing.T) {
 			[]uint{151},
 			1 << 6,
 			[]byte{0xcb, 0x80}, // 11001011 10000000
+		},
+
+		{
+			[]uint{65, 104},
+			1 << 6,
+			[]byte{0x81, 0x4e}, // 10000001 1001110
 		},
 	}
 
