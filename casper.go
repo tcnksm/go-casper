@@ -16,6 +16,9 @@ import (
 )
 
 const (
+	// cookieName is casper cookie name
+	//
+	// TODO(tcnksm): Enable to change this by option.
 	cookieName = "x-go-casper"
 )
 
@@ -58,13 +61,17 @@ func New(p, n int) *Casper {
 	}
 }
 
-// Push pushes the given content and set cookie value.
+// Push pushes the given contents.
 func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string, opts *Options) (*http.Request, error) {
 	// Pusher is used later in this function but should check
 	// it's available or not first to avoid unnessary calc.
 	pusher, ok := w.(http.Pusher)
 	if !ok {
 		return r, errors.New("server push is not supported") // go1.8 or later
+	}
+
+	if opts == nil {
+		opts = &Options{}
 	}
 
 	// Remove casper cookie header if it's already exists.
@@ -90,6 +97,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 	}
 
 	// Push contents one by one.
+	// TODO(tcnksm): Is it possible to push concurrently ?
 	for _, content := range contents {
 		h := c.hash([]byte(content))
 

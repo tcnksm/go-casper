@@ -361,17 +361,16 @@ func newTestServer(t *testing.T, casper *Casper, contents []string, sameTime boo
 			http.SetCookie(w, cookie)
 		}
 
-		opts := &Options{}
 		if sameTime {
 			// Push all contents at same time
-			if _, err := casper.Push(w, r, contents, opts); err != nil {
+			if _, err := casper.Push(w, r, contents, nil); err != nil {
 				t.Fatalf("Push failed: %s", err)
 			}
 		} else {
 			// Push contents one by one. Test for context.
 			for _, content := range contents {
 				var err error
-				r, err = casper.Push(w, r, []string{content}, opts)
+				r, err = casper.Push(w, r, []string{content}, nil)
 				if err != nil {
 					t.Fatalf("Push failed: %s", err)
 				}
