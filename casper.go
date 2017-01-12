@@ -20,10 +20,10 @@ const (
 )
 
 var (
+	// hashContextkey is used for storing hash values in context.Value
 	hashContextkey = &contextKey{"casper-hash"}
 )
 
-// Casper stores
 type Casper struct {
 	p uint
 	n uint
@@ -92,17 +92,19 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 	// Push contents one by one.
 	for _, content := range contents {
 		h := c.hash([]byte(content))
+
+		// Check the content is already pushed or not.
 		if search(hashValues, h) {
 			continue
 		}
 
-		if c.inMemory {
-			// Push to in memory buffer. This is only for testing.
-			c.buf = append(c.buf, content)
-		} else {
+		if !c.inMemory {
 			if err := pusher.Push(content, opts.PushOptions); err != nil {
 				return r, err
 			}
+		} else {
+			// Push to in memory buffer. This is only for testing.
+			c.buf = append(c.buf, content)
 		}
 
 		hashValues = append(hashValues, h)
@@ -145,7 +147,7 @@ func (c *Casper) generateCookie(hashValues []uint) (*http.Cookie, error) {
 	})
 
 	var buf bytes.Buffer
-	encoder := base64.NewEncoder(base64.URLEncoding, &buf)
+	encoder := base64.NewEncoder(base64.RawURLEncoding, &buf)
 	if err := golomb.Encode(encoder, hashValues, c.p); err != nil {
 		return nil, err
 	}
@@ -173,7 +175,7 @@ func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
 	}
 
 	// Decode golomb coded cookie value to original hash values array.
-	decoder := base64.NewDecoder(base64.URLEncoding, strings.NewReader(cookie.Value))
+	decoder := base64.NewDecoder(base64.RawURLEncoding, strings.NewReader(cookie.Value))
 	hashValues, err := golomb.DecodeAll(decoder, c.p)
 	if err != nil {
 		return nil, err
