@@ -1,15 +1,16 @@
-# go-casper
+# go-casper [![Travis](https://img.shields.io/travis/tcnksm/go-casper.svg?style=flat-square)][travis] [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)][license] [![Go Documentation](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godocs]
 
-Golang implementation of CASPer (cache-aware server-push)
+[travis]: https://travis-ci.org/tcnksm/go-casper
+[license]: https://github.com/tcnksm/go-casper/blob/master/LICENSE
+[godocs]: http://godoc.org/github.com/tcnksm/go-casper
+
+Golang implementation of CASPer (cache-aware server-push). 
 
 ## TODO
 
-- [ ] Add more testing
-- [ ] Add Benchmark
-- [ ] Add complete example
 - [ ] Add default cookie option 
+- [ ] Add complete example
 - [ ] Enable to force push
-- [ ] Enable to reset cookie
 - [ ] Documentation 
 
 ## References
