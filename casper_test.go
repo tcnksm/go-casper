@@ -124,9 +124,9 @@ func TestPush(t *testing.T) {
 			nil,
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "KA",
-				Raw:   "x-go-casper=KA",
+				Path:  defaultCookiePath,
 			},
 			[]string{"/static/example.jpg"},
 		},
@@ -139,9 +139,9 @@ func TestPush(t *testing.T) {
 			nil,
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "KA",
-				Raw:   "x-go-casper=KA",
+				Path:  defaultCookiePath,
 			},
 			[]string{"/static/example.jpg"},
 		},
@@ -159,9 +159,9 @@ func TestPush(t *testing.T) {
 			nil,
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU54MA",
-				Raw:   "x-go-casper=gU54MA",
+				Path:  defaultCookiePath,
 			},
 			[]string{
 				"/js/jquery-1.9.1.min.js",
@@ -184,9 +184,9 @@ func TestPush(t *testing.T) {
 			},
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "KA",
-				Raw:   "x-go-casper=KA",
+				Path:  defaultCookiePath,
 			},
 			[]string{"/static/example.jpg"},
 		},
@@ -206,15 +206,15 @@ func TestPush(t *testing.T) {
 			// This means these are already pushed on previous request and should not
 			// be pushed this time.
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU4",
 			},
 			nil,
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU54MA",
-				Raw:   "x-go-casper=gU54MA",
+				Path:  defaultCookiePath,
 			},
 			[]string{
 				"/static/logo.jpg",
@@ -236,15 +236,15 @@ func TestPush(t *testing.T) {
 			// This means these are already pushed on previous request and should not
 			// be pushed this time.
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU4",
 			},
 			nil,
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU54MA",
-				Raw:   "x-go-casper=gU54MA",
+				Path:  defaultCookiePath,
 			},
 			[]string{
 				"/static/logo.jpg",
@@ -267,7 +267,7 @@ func TestPush(t *testing.T) {
 			// This means these are already pushed on previous request and should not
 			// be pushed this time.
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU4",
 			},
 
@@ -278,9 +278,9 @@ func TestPush(t *testing.T) {
 			},
 
 			&http.Cookie{
-				Name:  cookieName,
+				Name:  defaultCookieName,
 				Value: "gU54MA",
-				Raw:   "x-go-casper=gU54MA",
+				Path:  defaultCookiePath,
 			},
 			[]string{
 				"/static/logo.jpg",
@@ -332,6 +332,7 @@ func TestPush(t *testing.T) {
 			t.Fatalf("Number of cookie %d, want %d", got, want)
 		}
 
+		tc.casperCookie.Raw = tc.casperCookie.String() // Need to set Raw to compare
 		if got, want := cookies[wantCookie-1], tc.casperCookie; !reflect.DeepEqual(got, want) {
 			t.Fatalf("Get cookie name %#v, want %#v", got, want)
 		}

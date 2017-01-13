@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	// cookieName is casper cookie name
-	//
-	// TODO(tcnksm): Enable to change this by option.
-	cookieName = "x-go-casper"
+	// defaultCookieName is default cookie name for storing
+	// a fingerprint of asset files being cached by the browser.
+	defaultCookieName = "x-go-casper"
+
+	defaultCookiePath = "/"
 )
 
 var (
@@ -78,7 +79,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 	if cookies, ok := w.Header()["Set-Cookie"]; ok && len(cookies) != 0 {
 		w.Header().Del("Set-Cookie")
 		for _, cookieStr := range cookies {
-			if strings.Contains(cookieStr, cookieName+"=") {
+			if strings.Contains(cookieStr, defaultCookieName+"=") {
 				continue
 			}
 			w.Header().Add("Set-Cookie", cookieStr)
@@ -165,14 +166,16 @@ func (c *Casper) generateCookie(hashValues []uint) (*http.Cookie, error) {
 	}
 
 	return &http.Cookie{
-		Name:  cookieName,
+		Name:  defaultCookieName,
 		Value: buf.String(),
+
+		Path: defaultCookiePath,
 	}, nil
 }
 
 // readCookie reads cookie from http request and decode it to hash array.
 func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
-	cookie, err := r.Cookie(cookieName)
+	cookie, err := r.Cookie(defaultCookieName)
 	if err != nil && err != http.ErrNoCookie {
 		return nil, err
 	}
