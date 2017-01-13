@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -32,13 +33,15 @@ type Casper struct {
 	p uint
 	n uint
 
-	// inMemory decides executing actual server push or fakely push
-	// to in memory buffer(buf) for testing. This should be true only in testing.
+	// buf is last assets pushed by a call to Push.
+	buf []string
+
+	// skipPush decides executing actual server push or not. This should
+	// be used only in testing.
 	//
 	// Currently, it's kinda hard to receive http push in go http client.
 	// This should be removed in future.
-	inMemory bool
-	buf      []string
+	skipPush bool
 }
 
 // Options includes casper push options.
@@ -62,8 +65,11 @@ func New(p, n int) *Casper {
 	}
 }
 
-// Push pushes the given contents.
-func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string, opts *Options) (*http.Request, error) {
+// Push pushes the given assets.
+func (c *Casper) Push(w http.ResponseWriter, r *http.Request, assets []string, opts *Options) (*http.Request, error) {
+	// Empty buffer.
+	c.buf = make([]string, 0, len(assets))
+
 	// Pusher is used later in this function but should check
 	// it's available or not first to avoid unnessary calc.
 	pusher, ok := w.(http.Pusher)
@@ -99,7 +105,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 
 	// Push contents one by one.
 	// TODO(tcnksm): Is it possible to push concurrently ?
-	for _, content := range contents {
+	for _, content := range assets {
 		h := c.hash([]byte(content))
 
 		// Check the content is already pushed or not.
@@ -107,7 +113,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 			continue
 		}
 
-		if !c.inMemory {
+		if !c.skipPush {
 			if err := pusher.Push(content, opts.PushOptions); err != nil {
 				return r, err
 			}
@@ -127,6 +133,12 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, contents []string,
 	http.SetCookie(w, cookie)
 
 	return r.WithContext(withHashValues(r.Context(), hashValues)), nil
+}
+
+// Pushed returns the most recent assets pushed by a call to Push.
+// The underlying buffer may will be overwritten by next call to Push.
+func (c *Casper) Pushed() []string {
+	return c.buf
 }
 
 // hash generate a hash value from the given bytes for
@@ -158,11 +170,11 @@ func (c *Casper) generateCookie(hashValues []uint) (*http.Cookie, error) {
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.RawURLEncoding, &buf)
 	if err := golomb.Encode(encoder, hashValues, c.p); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed golomb coding: %s", err)
 	}
 
 	if err := encoder.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to close encoder: %s", err)
 	}
 
 	return &http.Cookie{
@@ -177,7 +189,7 @@ func (c *Casper) generateCookie(hashValues []uint) (*http.Cookie, error) {
 func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
 	cookie, err := r.Cookie(defaultCookieName)
 	if err != nil && err != http.ErrNoCookie {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cookie: %s", err)
 	}
 
 	if err == http.ErrNoCookie {
@@ -189,7 +201,7 @@ func (c *Casper) readCookie(r *http.Request) ([]uint, error) {
 	decoder := base64.NewDecoder(base64.RawURLEncoding, strings.NewReader(cookie.Value))
 	hashValues, err := golomb.DecodeAll(decoder, c.p)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed golomb decoding: %s", err)
 	}
 
 	return hashValues, nil

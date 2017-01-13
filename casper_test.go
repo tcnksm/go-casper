@@ -12,7 +12,7 @@ import (
 
 func TestGenerateCookie(t *testing.T) {
 	cases := []struct {
-		contents    []string
+		assets      []string
 		P           int
 		cookieValue string
 	}{
@@ -86,10 +86,10 @@ func TestGenerateCookie(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		casper := New(tc.P, len(tc.contents))
+		casper := New(tc.P, len(tc.assets))
 
-		hashValues := make([]uint, 0, len(tc.contents))
-		for _, content := range tc.contents {
+		hashValues := make([]uint, 0, len(tc.assets))
+		for _, content := range tc.assets {
 			hashValues = append(hashValues, casper.hash([]byte(content)))
 		}
 
@@ -291,7 +291,7 @@ func TestPush(t *testing.T) {
 
 	for _, tc := range cases {
 		pusher := New(tc.p, len(tc.push))
-		pusher.inMemory = true
+		pusher.skipPush = true
 
 		testServer := newTestServer(t, pusher, tc.push, tc.sameTime, tc.serverCookie)
 		defer testServer.Close()
@@ -312,13 +312,20 @@ func TestPush(t *testing.T) {
 		}
 		defer res.Body.Close()
 
-		// Inspect in memory buffer
-		if got, want := len(pusher.buf), len(tc.pushed); got != want {
+		// Inspect pushed contents
+		// TODO(tcnksm): Separate test push one by one and push same time.
+		n := len(tc.pushed)
+		if !tc.sameTime {
+			n = 1
+		}
+		if got, want := len(pusher.Pushed()), n; got != want {
 			t.Fatalf("number of pushed contents %d, want %d", got, want)
 		}
 
-		if got, want := pusher.buf, tc.pushed; !reflect.DeepEqual(got, want) {
-			t.Fatalf("number of pushed contents %v, want %v", got, want)
+		if tc.sameTime {
+			if got, want := pusher.Pushed(), tc.pushed; !reflect.DeepEqual(got, want) {
+				t.Fatalf("number of pushed contents %v, want %v", got, want)
+			}
 		}
 
 		// Inspect cookies to be returned from server.
