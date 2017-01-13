@@ -6,13 +6,6 @@
 
 Golang implementation of CASPer (cache-aware server-push). 
 
-## TODO
-
-- [ ] Add default cookie option 
-- [ ] Add complete example
-- [ ] Enable to force push
-- [ ] Documentation 
-
 ## References
 
 - http://blog.kazuhooku.com/2015/10/performance-of-http2-push-and-server.html
