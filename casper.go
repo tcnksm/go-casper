@@ -1,3 +1,4 @@
+// Package casper provides methods for cache-aware HTTP/2 server push.
 package casper
 
 import (
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"bufio"
+
 	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
 
@@ -21,6 +24,8 @@ const (
 	// a fingerprint of asset files being cached by the browser.
 	defaultCookieName = "x-go-casper"
 
+	// defaultCookiePath is default cookie path to be used for
+	// generating cookie to return.
 	defaultCookiePath = "/"
 )
 
@@ -29,6 +34,7 @@ var (
 	hashContextkey = &contextKey{"casper-hash"}
 )
 
+// Casper provides a interface for cache-aware HTTP/2 server push.
 type Casper struct {
 	p uint
 	n uint
@@ -57,18 +63,30 @@ func (c *contextKey) String() string {
 	return c.name
 }
 
-// New initialize casper.
+// New returns a new casper with false positive probability is 1/p and
+// number of contents.
 func New(p, n int) *Casper {
+	bufio.NewScanner
 	return &Casper{
 		p: uint(p),
 		n: uint(n),
 	}
 }
 
-// Push pushes the given assets.
-func (c *Casper) Push(w http.ResponseWriter, r *http.Request, assets []string, opts *Options) (*http.Request, error) {
+// Push initiates an HTTP/2 server push using the given targets and options.
+// Internally, it just calls go's standard server push method (which was added
+// from go1.8).
+//
+// It generates a fingerprint of pushed targets compressed by Golomb-coding[1]
+// and sets it as a special cookie value to the given ResponseWriter. We can use
+// this cookie to determine the browser caches the specific targets or not.
+// So from next time when the server receives a request, it checks the cookie
+// and determine to push or not the given targets.
+//
+// [1]: https://en.wikipedia.org/wiki/Golomb_coding
+func (c *Casper) Push(w http.ResponseWriter, r *http.Request, targets []string, opts *Options) (*http.Request, error) {
 	// Empty buffer.
-	c.buf = make([]string, 0, len(assets))
+	c.buf = make([]string, 0, len(targets))
 
 	// Pusher is used later in this function but should check
 	// it's available or not first to avoid unnessary calc.
@@ -105,7 +123,7 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, assets []string, o
 
 	// Push contents one by one.
 	// TODO(tcnksm): Is it possible to push concurrently ?
-	for _, content := range assets {
+	for _, content := range targets {
 		h := c.hash([]byte(content))
 
 		// Check the content is already pushed or not.
@@ -117,11 +135,10 @@ func (c *Casper) Push(w http.ResponseWriter, r *http.Request, assets []string, o
 			if err := pusher.Push(content, opts.PushOptions); err != nil {
 				return r, err
 			}
-		} else {
-			// Push to in memory buffer. This is only for testing.
-			c.buf = append(c.buf, content)
 		}
 
+		// also pushed in memory buffer
+		c.buf = append(c.buf, content)
 		hashValues = append(hashValues, h)
 	}
 
