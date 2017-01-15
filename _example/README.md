@@ -1,12 +1,13 @@
 # Example
 
-```bash
-$ openssl genrsa -out rootCA.key 2048
-$ openssl req -x509 -sha256 -new -nodes -key rootCA.key -days 1024 -out rootCA.pem
-```
+To run this example, you needs crts and key. If you don't have it then generate it by the following script,
 
 ```bash
-$ openssl genrsa -out server.key 2048
-$ openssl req -new -key server.key -out server.csr -sha256
-$ openssl x509 -req -in server.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out server.crt -days 500 -sha256
+$ ./crts/generate.sh
+```
+
+To run example,
+
+```bash
+$ go run main.go
 ```
