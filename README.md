@@ -14,7 +14,7 @@ To solve these problem, [H2O](https://github.com/h2o/h2o), a server that provide
 
 The full documentation is available on [Godoc][godocs].
 
-*NOTE1*: The project is still under heavy implementation. API may be changed in future and documentaion is incomplete. 
+*NOTE1*: This project is still a proof of concept and still under heavy implementation. API may be changed in future and documentaion is incomplete. This code should not be run in production. Comments are all welcome! 
 
 *NOTE2*: There is a [draft](https://datatracker.ietf.org/doc/draft-kazuho-h2-cache-digest/) by H2O author which defines a HTTP/2 frame type to allow clients to inform the server of their cache's contents 👏 This pacakage can be replace with it in future. 
 
