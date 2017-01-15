@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 
-	"bufio"
-
 	"github.com/tcnksm/go-casper/internal/encoding/golomb"
 )
 
@@ -66,7 +64,6 @@ func (c *contextKey) String() string {
 // New returns a new casper with false positive probability is 1/p and
 // number of contents.
 func New(p, n int) *Casper {
-	bufio.NewScanner
 	return &Casper{
 		p: uint(p),
 		n: uint(n),
