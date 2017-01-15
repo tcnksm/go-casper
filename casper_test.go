@@ -18,10 +18,10 @@ func TestGenerateCookie(t *testing.T) {
 	}{
 		{
 			[]string{
-				"/static/example.jpg",
+				"/static/example.js",
 			},
 			1 << 6,
-			"KA",
+			"JA",
 		},
 
 		{
