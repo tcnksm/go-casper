@@ -4,7 +4,7 @@
 [license]: https://github.com/tcnksm/go-casper/blob/master/LICENSE
 [godocs]: http://godoc.org/github.com/tcnksm/go-casper
 
-Package `go-casper` is golang implementation of [H2O](https://github.com/h2o/h2o)'s [CASPer](https://h2o.examp1e.net/configure/http2_directives.html#http2-casper) (cache-aware server-push).
+Package `go-casper` is Golang implementation of [H2O](https://github.com/h2o/h2o)'s [CASPer](https://h2o.examp1e.net/configure/http2_directives.html#http2-casper) (cache-aware server-push).
 
 [Go 1.8](https://tip.golang.org/doc/go1.8) is going to support HTTP/2 server push. Server push allows us to send resources like CSS or JavaScript files before the client asks (so we can expect faster page rendering). As described on [this post](http://blog.kazuhooku.com/2015/10/performance-of-http2-push-and-server.html) or [this issue](https://github.com/h2o/h2o/issues/421), one of the important things to use server push is to know *when to push*. Since it's waste of the network bandwidth (and cause negative effects on response time), you should avoid to push the asset which has already been cached by the client. 
 
