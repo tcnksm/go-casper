@@ -45,4 +45,4 @@ http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-You can find the complete example [here](/example).
+You can find the complete example [here](/_example).
