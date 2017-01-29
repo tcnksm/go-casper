@@ -1,0 +1,13 @@
+{
+    "memo": "90d1614c35393f2ba0bddf0bc33852c7e131e238c1fc20dc3ffcf75c65de854d",
+    "projects": [
+        {
+            "name": "golang.org/x/net",
+            "branch": "master",
+            "revision": "f2499483f923065a842d38eb4c7f1927e6fc6e6d",
+            "packages": [
+                "http2"
+            ]
+        }
+    ]
+}
