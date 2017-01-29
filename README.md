@@ -1,4 +1,4 @@
-# go-casper [![Travis](https://img.shields.io/travis/tcnksm/go-casper.svg?style=flat-square)][travis] [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)][license] [![Go Documentation](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godocs]
+# go-casper [![Go Documentation](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godocs] [![Travis](https://img.shields.io/travis/tcnksm/go-casper.svg?style=flat-square)][travis] [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)][license]
 
 [travis]: https://travis-ci.org/tcnksm/go-casper
 [license]: https://github.com/tcnksm/go-casper/blob/master/LICENSE

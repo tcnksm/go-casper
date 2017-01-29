@@ -1,4 +1,5 @@
 language: go
+
 go:
   - 1.8rc3
   - tip
@@ -13,4 +14,4 @@ install:
   - echo "skipping travis' default"
 
 script:
-  - go test -v
+  - make test-all
