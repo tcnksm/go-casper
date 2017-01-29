@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-// Writer
+// Writer writes bits into underlying io.Writer
 type Writer struct {
 	n int  // current number of bits
 	v uint // current accumulated value
@@ -49,6 +49,7 @@ func (w *Writer) Flush() error {
 	return nil
 }
 
+// Reader reads bits from the given io.Reader.
 type Reader struct {
 	n int  // current number of bits
 	v uint // current accumulated value
@@ -56,6 +57,7 @@ type Reader struct {
 	rd io.Reader
 }
 
+// NewReader returns new a new Reader.
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		rd: rd,
