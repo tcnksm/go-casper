@@ -128,7 +128,7 @@ func TestEncoding(t *testing.T) {
 	}
 }
 
-func ExampleGlombSet() {
+func ExampleEncode() {
 	// Number of elements and false positive probability.
 	//
 	// Minimum number of bits is N*log(P)
